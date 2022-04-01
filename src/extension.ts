@@ -3,10 +3,8 @@
 import * as vscode from 'vscode';
 import OctopusApiSettings from './OctopusApiSettings';
 import * as process from "process";
-import { settings } from 'cluster';
 import { Client, ClientConfiguration, Repository } from '@octopusdeploy/api-client';
 import { DeploymentResource, ProjectResource, ReleaseResource, ResourceCollection } from '@octopusdeploy/message-contracts';
-import { BasicRepository } from '@octopusdeploy/api-client/dist/repositories/basicRepository';
 
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
@@ -17,34 +15,11 @@ export function activate(context: vscode.ExtensionContext) {
 	let octoConfig: ClientConfiguration;
 	let client: Client | undefined;
 	let repository: Repository | undefined;
+	let selectedProject: ProjectResource | undefined;
+	let selectedRelease: ReleaseResource | undefined;
 	
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with registerCommand
-	// The commandId parameter must match the command field in package.json
-	let viewLogsDisposable = vscode.commands.registerCommand('octopus-logs.viewLogs', async () => {
-		// The code you place here will be executed every time your command is executed
-		// Display a message box to the user
-		var projects = await getProjects();
-		var projectQickPicks = projects?.map<vscode.QuickPickItem>(project => <vscode.QuickPickItem>{
-			detail: project.Id,
-			description: project.Description,
-			label: project.Name,
-			somethingElse: project,
-			kind: vscode.QuickPickItemKind.Default
-		}) ?? [];
-		var selectedProject = await vscode.window.showQuickPick(projectQickPicks, {
-			title: "Octopus Project"
-		});
 
-		if(!selectedProject?.detail) {
-			return;
-		}
-		
-
-		vscode.window.showInformationMessage('View Octopus Deploy Log!');
-	});
-	context.subscriptions.push(viewLogsDisposable);
-
+	// Register commands
 	let initOctopusDisposable = vscode.commands.registerCommand('octopus-logs.initOctopus', async () => {
 		let envApiKey = process.env["OCTOPUS_CLI_API_KEY"];
 		let secretApiKey = await octoSettings.getApiKey();
@@ -77,6 +52,61 @@ export function activate(context: vscode.ExtensionContext) {
 		client = undefined;
 		repository = undefined;
 	});
+
+	let selectProjectDisposable = vscode.commands.registerCommand('octopus-logs.selectProject', async () => {
+		var projects = await getProjects();
+		var projectQickPicks = projects?.map<vscode.QuickPickItem>(project => <vscode.QuickPickItem>{
+			detail: project.Id,
+			description: project.Description,
+			label: project.Name,
+			somethingElse: project,
+			kind: vscode.QuickPickItemKind.Default
+		}) ?? [];
+		var quickSelectSelection = await vscode.window.showQuickPick(projectQickPicks, {
+			title: "Octopus Project"
+		});
+
+		if(!quickSelectSelection?.detail) {
+			return;
+		}
+		selectedProject = projects?.filter(p => p.Id === quickSelectSelection?.detail)[0] ?? undefined;
+		vscode.window.showInformationMessage(`Selected project ${selectedProject?.Name}`);
+	});
+
+	let selectReleaseDisposable = vscode.commands.registerCommand('octopus-logs.selectRelease', async () => {
+		if(!selectedProject) {vscode.window.showInformationMessage('No project selected'); return;}
+		var releases = await getReleases(selectedProject);
+		var releaseQuickPicks = releases?.map<vscode.QuickPickItem>(release => <vscode.QuickPickItem>{
+			detail: release.Id,
+			description: release.ReleaseNotes,
+			label: release.Version,
+			somethingElse: release,
+			kind: vscode.QuickPickItemKind.Default
+		}) ?? [];
+
+		var quickSelectSelection = await vscode.window.showQuickPick(releaseQuickPicks, {
+			title: `Octopus Release for ${selectedProject.Name}` 
+		});
+
+		if(!quickSelectSelection?.detail) {
+			return;
+		}
+		selectedRelease = releases?.filter(r => r.Id === quickSelectSelection?.detail)[0] ?? undefined;
+		vscode.window.showInformationMessage(`Selected release ${quickSelectSelection.detail}`);
+	});
+
+	let viewLogsDisposable = vscode.commands.registerCommand('octopus-logs.viewLogs', async () => {
+		if(!selectedProject) {vscode.window.showInformationMessage('No project selected'); return;}
+		if(!selectedRelease) {vscode.window.showInformationMessage('No release selected'); return;}
+
+		var latestDeployment = await getLatestDeploymentLog(selectedRelease);
+	});
+	context.subscriptions.push(initOctopusDisposable);
+	context.subscriptions.push(deInitOctopusDisposable);
+	context.subscriptions.push(selectProjectDisposable);
+	context.subscriptions.push(selectReleaseDisposable);
+	context.subscriptions.push(viewLogsDisposable);
+
 
 	let initializeClient = async () => {
 		try {
@@ -112,6 +142,41 @@ export function activate(context: vscode.ExtensionContext) {
 		return projects?.Items;
 	};
 
+	let getReleases = async (project: ProjectResource) => {
+		let releases: ResourceCollection<ReleaseResource> | undefined;
+
+		try {
+			releases = await repository?.projects.getReleases(project);
+		} catch (error) {
+			console.error(error);
+		}
+		return releases?.Items;
+	};
+
+	let getLatestDeploymentLog = async (selectedRelease: ReleaseResource) => {
+		let deployments: ResourceCollection<DeploymentResource> | undefined;
+
+		try {
+			deployments = await repository?.releases.getDeployments(selectedRelease);
+			var serverTask = await repository?.tasks.list();
+			if(!serverTask) { return; }
+			var rawLog = await repository?.tasks.getRaw(serverTask.Items[0]);
+			if(!rawLog) { return;}
+			var rawLogObj: string[] = JSON.parse(rawLog);
+			var log = "";
+			rawLogObj.forEach(element => {
+				log += element;
+			});
+			vscode.workspace.openTextDocument({
+				language: "log",
+				content: log
+			});
+		} catch (error) {
+			console.error(error);
+		}
+		return deployments?.Items[0] || undefined;
+	};
+
 	let getDeployments = async (projectId: string) => {
 		let deployments: ResourceCollection<DeploymentResource> | undefined;
 
@@ -131,3 +196,5 @@ export function activate(context: vscode.ExtensionContext) {
 
 // this method is called when your extension is deactivated
 export function deactivate() {}
+
+
