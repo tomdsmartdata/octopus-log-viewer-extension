@@ -158,18 +158,15 @@ export function activate(context: vscode.ExtensionContext) {
 
 		try {
 			deployments = await repository?.releases.getDeployments(selectedRelease);
-			var serverTask = await repository?.tasks.list();
-			if(!serverTask) { return; }
-			var rawLog = await repository?.tasks.getRaw(serverTask.Items[0]);
-			if(!rawLog) { return;}
-			var rawLogObj: string[] = JSON.parse(rawLog);
-			var log = "";
-			rawLogObj.forEach(element => {
-				log += element;
-			});
-			vscode.workspace.openTextDocument({
+			if(!deployments?.Items) { return; }
+			var links = deployments.Items[0].Links;
+			var taskUrl = links["Task"];
+			var taskRaw: string | undefined = await repository?.client.getRaw(`${taskUrl}/raw`);
+			if(!taskRaw) { return; }
+			var taskParsed = Object.values(JSON.parse(taskRaw)).join("");
+			await vscode.workspace.openTextDocument({
 				language: "log",
-				content: log
+				content: taskParsed
 			});
 		} catch (error) {
 			console.error(error);
