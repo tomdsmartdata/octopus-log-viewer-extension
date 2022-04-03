@@ -17,6 +17,7 @@ export function activate(context: vscode.ExtensionContext) {
 	let repository: Repository | undefined;
 	let selectedProject: ProjectResource | undefined;
 	let selectedRelease: ReleaseResource | undefined;
+	let selectedDeployment: DeploymentResource | undefined;
 	
 
 	// Register commands
@@ -105,13 +106,21 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 		
 		var deployments = await getDeployments(selectedRelease);
-		var deploymentQuickPickOptions = -deployments?.map<vscode.QuickPickItem>(deployment => <vscode.QuickPickItem>{
+		var deploymentQuickPickOptions = deployments?.map<vscode.QuickPickItem>(deployment => <vscode.QuickPickItem>{
 			detail: deployment.Id,
 			description: deployment.Name,
 			label: deployment.Name,
 			somethingElse: deployment,
 			kind: vscode.QuickPickItemKind.Default
 		}) ?? [];
+		var quickSelectSelection = await vscode.window.showQuickPick(deploymentQuickPickOptions, {
+			title: `Octopus Deployment for ${selectedRelease.Version}`
+		});
+		if(!quickSelectSelection?.detail) {
+			return;
+		}
+		selectedDeployment = deployments?.filter(d => d.Id === quickSelectSelection?.detail)[0] ?? undefined;
+		vscode.window.showInformationMessage(`Selected deployment ${selectedDeployment.Name}`);
 	});
 
 	let viewLogsDisposable = vscode.commands.registerCommand('octopus-logs.viewLogs', async () => {
@@ -126,6 +135,7 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(deInitOctopusDisposable);
 	context.subscriptions.push(selectProjectDisposable);
 	context.subscriptions.push(selectReleaseDisposable);
+	context.subscriptions.push(selectDeploymentDisposable);
 	context.subscriptions.push(viewLogsDisposable);
 
 
