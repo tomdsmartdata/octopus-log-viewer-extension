@@ -74,7 +74,10 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 
 	let selectReleaseDisposable = vscode.commands.registerCommand('octopus-logs.selectRelease', async () => {
-		if(!selectedProject) {vscode.window.showInformationMessage('No project selected'); return;}
+		if(!selectedProject) {
+			await vscode.commands.executeCommand('octopus-logs.selectProject');
+			if(!selectedProject) { return; }
+		}
 		var releases = await getReleases(selectedProject);
 		var releaseQuickPicks = releases?.map<vscode.QuickPickItem>(release => <vscode.QuickPickItem>{
 			detail: release.Id,
@@ -93,6 +96,10 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 		selectedRelease = releases?.filter(r => r.Id === quickSelectSelection?.detail)[0] ?? undefined;
 		vscode.window.showInformationMessage(`Selected release ${quickSelectSelection.detail}`);
+	});
+
+	let selectDeploymentDisposable = vscode.commands.registerCommand('octopus-logs.selectDeployment', async () => {
+
 	});
 
 	let viewLogsDisposable = vscode.commands.registerCommand('octopus-logs.viewLogs', async () => {
