@@ -99,7 +99,19 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 
 	let selectDeploymentDisposable = vscode.commands.registerCommand('octopus-logs.selectDeployment', async () => {
-
+		if(!selectedRelease) {
+			await vscode.commands.executeCommand('octopus-logs.selectRelease');
+			if(!selectedRelease) { return; }
+		}
+		
+		var deployments = await getDeployments(selectedRelease);
+		var deploymentQuickPickOptions = -deployments?.map<vscode.QuickPickItem>(deployment => <vscode.QuickPickItem>{
+			detail: deployment.Id,
+			description: deployment.Name,
+			label: deployment.Name,
+			somethingElse: deployment,
+			kind: vscode.QuickPickItemKind.Default
+		}) ?? [];
 	});
 
 	let viewLogsDisposable = vscode.commands.registerCommand('octopus-logs.viewLogs', async () => {
@@ -183,18 +195,22 @@ export function activate(context: vscode.ExtensionContext) {
 		return deployments?.Items[0] || undefined;
 	};
 
-	let getDeployments = async (projectId: string) => {
+	let getDeployments = async (selectedRelease: ReleaseResource): Promise<DeploymentResource[]> => {
 		let deployments: ResourceCollection<DeploymentResource> | undefined;
+		let deploymentItems: DeploymentResource[] | undefined = [];
 
 		try {
-			deployments = await repository?.deployments.list({
-				projects: [projectId]
+			deployments = await repository?.releases.getDeployments(selectedRelease);
+			deploymentItems = deployments?.Items.sort((firstDeployment,secondDeployment)=> {
+				if(firstDeployment.Created < secondDeployment.Created) {return -1;}
+				else if (firstDeployment.Created === secondDeployment.Created) { return 0;}
+				else {return 1;}
 			});
 		} catch (error) {
 			console.error(error);
 		}
 
-		return deployments?.Items;
+		return deploymentItems ?? [];
 	};
 
 	initializeClient();

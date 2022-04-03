@@ -36,6 +36,11 @@
         "category": "Octopus"
       },
       {
+        "command": "octopus-logs.selectDeployment",
+        "title": "Select Deployment",
+        "category": "Octopus"
+      },
+      {
         "command": "octopus-logs.viewLogs",
         "title": "View Logs",
         "category": "Octopus"
