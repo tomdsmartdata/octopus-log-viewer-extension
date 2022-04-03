@@ -103,8 +103,10 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 
 	let viewLogsDisposable = vscode.commands.registerCommand('octopus-logs.viewLogs', async () => {
-		if(!selectedProject) {vscode.window.showInformationMessage('No project selected'); return;}
-		if(!selectedRelease) {vscode.window.showInformationMessage('No release selected'); return;}
+		if(!selectedRelease) {
+			await vscode.commands.executeCommand('octopus-logs.selectRelease');
+			if(!selectedRelease) { return; }
+		}
 
 		var latestDeployment = await getLatestDeploymentLog(selectedRelease);
 	});
