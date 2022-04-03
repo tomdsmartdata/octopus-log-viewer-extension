@@ -55,22 +55,7 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 
 	let selectProjectDisposable = vscode.commands.registerCommand('octopus-logs.selectProject', async () => {
-		var projects = await getProjects();
-		var projectQickPicks = projects?.map<vscode.QuickPickItem>(project => <vscode.QuickPickItem>{
-			detail: project.Id,
-			description: project.Description,
-			label: project.Name,
-			somethingElse: project,
-			kind: vscode.QuickPickItemKind.Default
-		}) ?? [];
-		var quickSelectSelection = await vscode.window.showQuickPick(projectQickPicks, {
-			title: "Octopus Project"
-		});
-
-		if(!quickSelectSelection?.detail) {
-			return;
-		}
-		selectedProject = projects?.filter(p => p.Id === quickSelectSelection?.detail)[0] ?? undefined;
+		selectedProject = await selectProject();
 		vscode.window.showInformationMessage(`Selected project ${selectedProject?.Name}`);
 	});
 
@@ -108,7 +93,6 @@ export function activate(context: vscode.ExtensionContext) {
 		var deployments = await getDeployments(selectedRelease);
 		var deploymentQuickPickOptions = deployments?.map<vscode.QuickPickItem>(deployment => <vscode.QuickPickItem>{
 			detail: deployment.Id,
-			description: deployment.Name,
 			label: deployment.Name,
 			somethingElse: deployment,
 			kind: vscode.QuickPickItemKind.Default
@@ -161,6 +145,10 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 	};
 
+
+	/**
+	 *	Retrieve data from API
+	 */
 	let getProjects = async () => {
 		let projects: ResourceCollection<ProjectResource> | undefined;
 
@@ -221,6 +209,28 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 
 		return deploymentItems ?? [];
+	};
+
+	/**
+	 * Select items
+	 */
+	let selectProject = async(): Promise<ProjectResource | undefined> => {
+		var projects = await getProjects();
+		var projectQickPicks = projects?.map<vscode.QuickPickItem>(project => <vscode.QuickPickItem>{
+			detail: project.Id,
+			description: project.Description,
+			label: project.Name,
+			somethingElse: project,
+			kind: vscode.QuickPickItemKind.Default
+		}) ?? [];
+		var quickSelectSelection = await vscode.window.showQuickPick(projectQickPicks, {
+			title: "Octopus Project"
+		});
+
+		if(!quickSelectSelection?.detail) {
+			return;
+		}
+		return projects?.filter(p => p.Id === quickSelectSelection?.detail)[0] ?? undefined;
 	};
 
 	initializeClient();
