@@ -64,24 +64,8 @@ export function activate(context: vscode.ExtensionContext) {
 			await vscode.commands.executeCommand('octopus-logs.selectProject');
 			if(!selectedProject) { return; }
 		}
-		var releases = await getReleases(selectedProject);
-		var releaseQuickPicks = releases?.map<vscode.QuickPickItem>(release => <vscode.QuickPickItem>{
-			detail: release.Id,
-			description: release.ReleaseNotes,
-			label: release.Version,
-			somethingElse: release,
-			kind: vscode.QuickPickItemKind.Default
-		}) ?? [];
-
-		var quickSelectSelection = await vscode.window.showQuickPick(releaseQuickPicks, {
-			title: `Octopus Release for ${selectedProject.Name}` 
-		});
-
-		if(!quickSelectSelection?.detail) {
-			return;
-		}
-		selectedRelease = releases?.filter(r => r.Id === quickSelectSelection?.detail)[0] ?? undefined;
-		vscode.window.showInformationMessage(`Selected release ${quickSelectSelection.detail}`);
+		selectedRelease = await selectRelease(selectedProject);
+		vscode.window.showInformationMessage(`Selected release ${selectedRelease?.Version}`);
 	});
 
 	let selectDeploymentDisposable = vscode.commands.registerCommand('octopus-logs.selectDeployment', async () => {
@@ -231,6 +215,26 @@ export function activate(context: vscode.ExtensionContext) {
 			return;
 		}
 		return projects?.filter(p => p.Id === quickSelectSelection?.detail)[0] ?? undefined;
+	};
+
+	let selectRelease = async(selectedProject: ProjectResource): Promise<ReleaseResource | undefined> => {
+		var releases = await getReleases(selectedProject);
+		var releaseQuickPicks = releases?.map<vscode.QuickPickItem>(release => <vscode.QuickPickItem>{
+			detail: release.Id,
+			description: release.ReleaseNotes,
+			label: release.Version,
+			somethingElse: release,
+			kind: vscode.QuickPickItemKind.Default
+		}) ?? [];
+
+		var quickSelectSelection = await vscode.window.showQuickPick(releaseQuickPicks, {
+			title: `Octopus Release for ${selectedProject.Name}` 
+		});
+
+		if(!quickSelectSelection?.detail) {
+			return;
+		}
+		return releases?.filter(r => r.Id === quickSelectSelection?.detail)[0] ?? undefined;
 	};
 
 	initializeClient();
