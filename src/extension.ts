@@ -54,58 +54,56 @@ export function activate(context: vscode.ExtensionContext) {
 		repository = undefined;
 	});
 
-	let selectProjectDisposable = vscode.commands.registerCommand('octopus-logs.selectProject', async () => {
+	let setProjectDisposable = vscode.commands.registerCommand('octopus-logs.setProject', async () => {
 		selectedProject = await selectProject();
 		vscode.window.showInformationMessage(`Selected project ${selectedProject?.Name}`);
 	});
 
-	let selectReleaseDisposable = vscode.commands.registerCommand('octopus-logs.selectRelease', async () => {
-		if(!selectedProject) {
-			await vscode.commands.executeCommand('octopus-logs.selectProject');
-			if(!selectedProject) { return; }
+	let setReleaseDisposable = vscode.commands.registerCommand('octopus-logs.setRelease', async () => {
+		var _selectedProject = selectedProject;
+		if(!_selectedProject) {
+			// await vscode.commands.executeCommand('octopus-logs.setProject');
+			_selectedProject = await selectProject();
+			if(!_selectedProject) { return; }
 		}
-		selectedRelease = await selectRelease(selectedProject);
+		selectedRelease = await selectRelease(_selectedProject);
 		vscode.window.showInformationMessage(`Selected release ${selectedRelease?.Version}`);
 	});
 
 	let selectDeploymentDisposable = vscode.commands.registerCommand('octopus-logs.selectDeployment', async () => {
 		if(!selectedRelease) {
-			await vscode.commands.executeCommand('octopus-logs.selectRelease');
+			await vscode.commands.executeCommand('octopus-logs.setRelease');
 			if(!selectedRelease) { return; }
 		}
-		
-		var deployments = await getDeployments(selectedRelease);
-		var deploymentQuickPickOptions = deployments?.map<vscode.QuickPickItem>(deployment => <vscode.QuickPickItem>{
-			detail: deployment.Id,
-			label: deployment.Name,
-			somethingElse: deployment,
-			kind: vscode.QuickPickItemKind.Default
-		}) ?? [];
-		var quickSelectSelection = await vscode.window.showQuickPick(deploymentQuickPickOptions, {
-			title: `Octopus Deployment for ${selectedRelease.Version}`
-		});
-		if(!quickSelectSelection?.detail) {
-			return;
-		}
-		selectedDeployment = deployments?.filter(d => d.Id === quickSelectSelection?.detail)[0] ?? undefined;
-		vscode.window.showInformationMessage(`Selected deployment ${selectedDeployment.Name}`);
+		var _selectedDeployment = await selectDeployment(selectedRelease);
+		selectedDeployment = _selectedDeployment;
+		vscode.window.showInformationMessage(`Selected deployment ${selectedDeployment?.Name}`);
 	});
 
-	let viewLogsDisposable = vscode.commands.registerCommand('octopus-logs.viewLogs', async () => {
+	let viewLatestLogDisposable = vscode.commands.registerCommand('octopus-logs.viewLatestLog', async () => {
 		if(!selectedRelease) {
-			await vscode.commands.executeCommand('octopus-logs.selectRelease');
+			await vscode.commands.executeCommand('octopus-logs.setRelease');
 			if(!selectedRelease) { return; }
 		}
 
 		var latestDeployment = await getLatestDeploymentLog(selectedRelease);
 	});
+
+	let viewDeploymentLogDisposable = vscode.commands.registerCommand('octopus-logs.viewDeploymentLog', async () => {
+		if(!selectedDeployment) {
+			await vscode.commands.executeCommand('octopus-logs.selectDeployment');
+			if(!selectedDeployment) { return; }
+		}
+		await getDeploymentLog(selectedDeployment);
+	});
+
 	context.subscriptions.push(initOctopusDisposable);
 	context.subscriptions.push(deInitOctopusDisposable);
-	context.subscriptions.push(selectProjectDisposable);
-	context.subscriptions.push(selectReleaseDisposable);
+	context.subscriptions.push(setProjectDisposable);
+	context.subscriptions.push(setReleaseDisposable);
 	context.subscriptions.push(selectDeploymentDisposable);
-	context.subscriptions.push(viewLogsDisposable);
-
+	context.subscriptions.push(viewLatestLogDisposable);
+	context.subscriptions.push(viewDeploymentLogDisposable);
 
 	let initializeClient = async () => {
 		try {
@@ -156,6 +154,40 @@ export function activate(context: vscode.ExtensionContext) {
 		return releases?.Items;
 	};
 
+	let getDeployments = async (selectedRelease: ReleaseResource): Promise<DeploymentResource[]> => {
+		let deployments: ResourceCollection<DeploymentResource> | undefined;
+		let deploymentItems: DeploymentResource[] | undefined = [];
+
+		try {
+			deployments = await repository?.releases.getDeployments(selectedRelease);
+			deploymentItems = deployments?.Items.sort((firstDeployment,secondDeployment)=> {
+				if(firstDeployment.Created < secondDeployment.Created) {return -1;}
+				else if (firstDeployment.Created === secondDeployment.Created) { return 0;}
+				else {return 1;}
+			});
+		} catch (error) {
+			console.error(error);
+		}
+
+		return deploymentItems ?? [];
+	};
+
+	let getDeploymentLog = async ( _selectedDeployment: DeploymentResource) => {
+		try {
+			var links = _selectedDeployment.Links;
+			var taskUrl = links["Task"];
+			var taskRaw: string | undefined = await repository?.client.getRaw(`${taskUrl}/raw`);
+			if(!taskRaw) { return; }
+			var taskParsed = Object.values(JSON.parse(taskRaw)).join("");
+			await vscode.workspace.openTextDocument({
+				language: "log",
+				content: taskParsed
+			});
+		} catch (error) {
+			console.error(error);
+		}
+	};
+
 	let getLatestDeploymentLog = async (selectedRelease: ReleaseResource) => {
 		let deployments: ResourceCollection<DeploymentResource> | undefined;
 
@@ -175,24 +207,6 @@ export function activate(context: vscode.ExtensionContext) {
 			console.error(error);
 		}
 		return deployments?.Items[0] || undefined;
-	};
-
-	let getDeployments = async (selectedRelease: ReleaseResource): Promise<DeploymentResource[]> => {
-		let deployments: ResourceCollection<DeploymentResource> | undefined;
-		let deploymentItems: DeploymentResource[] | undefined = [];
-
-		try {
-			deployments = await repository?.releases.getDeployments(selectedRelease);
-			deploymentItems = deployments?.Items.sort((firstDeployment,secondDeployment)=> {
-				if(firstDeployment.Created < secondDeployment.Created) {return -1;}
-				else if (firstDeployment.Created === secondDeployment.Created) { return 0;}
-				else {return 1;}
-			});
-		} catch (error) {
-			console.error(error);
-		}
-
-		return deploymentItems ?? [];
 	};
 
 	/**
@@ -235,6 +249,24 @@ export function activate(context: vscode.ExtensionContext) {
 			return;
 		}
 		return releases?.filter(r => r.Id === quickSelectSelection?.detail)[0] ?? undefined;
+	};
+
+	let selectDeployment = async(_selectedRelease: ReleaseResource): Promise<DeploymentResource | undefined> => {
+				
+		var deployments = await getDeployments(_selectedRelease);
+		var deploymentQuickPickOptions = deployments?.map<vscode.QuickPickItem>(deployment => <vscode.QuickPickItem>{
+			detail: deployment.Id,
+			label: deployment.Name,
+			somethingElse: deployment,
+			kind: vscode.QuickPickItemKind.Default
+		}) ?? [];
+		var quickSelectSelection = await vscode.window.showQuickPick(deploymentQuickPickOptions, {
+			title: `Octopus Deployment for ${_selectedRelease.Version}`
+		});
+		if(!quickSelectSelection?.detail) {
+			return;
+		}
+		return deployments?.filter(d => d.Id === quickSelectSelection?.detail)[0] ?? undefined;
 	};
 
 	initializeClient();

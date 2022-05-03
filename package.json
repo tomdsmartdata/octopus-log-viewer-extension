@@ -26,12 +26,12 @@
         "category": "Octopus"
       },
       {
-        "command": "octopus-logs.selectProject",
+        "command": "octopus-logs.setProject",
         "title": "Select Project",
         "category": "Octopus"
       },
       {
-        "command": "octopus-logs.selectRelease",
+        "command": "octopus-logs.setRelease",
         "title": "Select Release",
         "category": "Octopus"
       },
@@ -41,8 +41,13 @@
         "category": "Octopus"
       },
       {
-        "command": "octopus-logs.viewLogs",
-        "title": "View Logs",
+        "command": "octopus-logs.viewLatestLog",
+        "title": "View Latest Deployment Log",
+        "category": "Octopus"
+      },
+      {
+        "command": "octopus-logs.viewDeploymentLog",
+        "title": "View Deployment Log",
         "category": "Octopus"
       }
     ]
