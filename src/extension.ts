@@ -97,6 +97,20 @@ export function activate(context: vscode.ExtensionContext) {
 		await getDeploymentLog(selectedDeployment);
 	});
 
+	let clearProjectDisposable = vscode.commands.registerCommand('octopus-logs.clearProject', async () => {
+		selectedProject = undefined;
+	});
+
+	let clearReleaseDisposable = vscode.commands.registerCommand('octopus-logs.clearRelease', async () => {
+		await vscode.commands.executeCommand('octopus-logs.clearProject');
+		selectedRelease = undefined;
+	});
+
+	let clearDeploymentDisposable = vscode.commands.registerCommand('octopus-logs.clearDeployment', async () => {
+		await vscode.commands.executeCommand('octopus-logs.clearRelease');
+		selectedDeployment = undefined;
+	});
+
 	context.subscriptions.push(initOctopusDisposable);
 	context.subscriptions.push(deInitOctopusDisposable);
 	context.subscriptions.push(setProjectDisposable);
@@ -104,6 +118,9 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(selectDeploymentDisposable);
 	context.subscriptions.push(viewLatestLogDisposable);
 	context.subscriptions.push(viewDeploymentLogDisposable);
+	context.subscriptions.push(clearProjectDisposable);
+	context.subscriptions.push(clearReleaseDisposable);
+	context.subscriptions.push(clearDeploymentDisposable);
 
 	let initializeClient = async () => {
 		try {

@@ -27,17 +27,32 @@
       },
       {
         "command": "octopus-logs.setProject",
-        "title": "Select Project",
+        "title": "Set Project",
         "category": "Octopus"
       },
       {
         "command": "octopus-logs.setRelease",
-        "title": "Select Release",
+        "title": "Set Release",
         "category": "Octopus"
       },
       {
         "command": "octopus-logs.selectDeployment",
-        "title": "Select Deployment",
+        "title": "Set Deployment",
+        "category": "Octopus"
+      },
+      {
+        "command": "octopus-logs.clearProject",
+        "title": "Clear Project Selection",
+        "category": "Octopus"
+      },
+      {
+        "command": "octopus-logs.clearRelease",
+        "title": "Clear Release Selection",
+        "category": "Octopus"
+      },
+      {
+        "command": "octopus-logs.clearDeployment",
+        "title": "Clear Deployment Selection",
         "category": "Octopus"
       },
       {
