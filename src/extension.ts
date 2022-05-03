@@ -18,6 +18,8 @@ export function activate(context: vscode.ExtensionContext) {
 	let selectedProject: ProjectResource | undefined;
 	let selectedRelease: ReleaseResource | undefined;
 	let selectedDeployment: DeploymentResource | undefined;
+
+	let octopusStatusBarItem: vscode.StatusBarItem;
 	
 
 	// Register commands
@@ -57,6 +59,7 @@ export function activate(context: vscode.ExtensionContext) {
 	let setProjectDisposable = vscode.commands.registerCommand('octopus-logs.setProject', async () => {
 		selectedProject = await selectProject();
 		vscode.window.showInformationMessage(`Selected project ${selectedProject?.Name}`);
+		await updateOctopusStatusBarItem();
 	});
 
 	let setReleaseDisposable = vscode.commands.registerCommand('octopus-logs.setRelease', async () => {
@@ -68,6 +71,7 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 		selectedRelease = await selectRelease(_selectedProject);
 		vscode.window.showInformationMessage(`Selected release ${selectedRelease?.Version}`);
+		await updateOctopusStatusBarItem();
 	});
 
 	let selectDeploymentDisposable = vscode.commands.registerCommand('octopus-logs.selectDeployment', async () => {
@@ -78,6 +82,7 @@ export function activate(context: vscode.ExtensionContext) {
 		var _selectedDeployment = await selectDeployment(selectedRelease);
 		selectedDeployment = _selectedDeployment;
 		vscode.window.showInformationMessage(`Selected deployment ${selectedDeployment?.Name}`);
+		await updateOctopusStatusBarItem();
 	});
 
 	let viewLatestLogDisposable = vscode.commands.registerCommand('octopus-logs.viewLatestLog', async () => {
@@ -99,16 +104,19 @@ export function activate(context: vscode.ExtensionContext) {
 
 	let clearProjectDisposable = vscode.commands.registerCommand('octopus-logs.clearProject', async () => {
 		selectedProject = undefined;
+		await updateOctopusStatusBarItem();
 	});
 
 	let clearReleaseDisposable = vscode.commands.registerCommand('octopus-logs.clearRelease', async () => {
 		await vscode.commands.executeCommand('octopus-logs.clearProject');
 		selectedRelease = undefined;
+		await updateOctopusStatusBarItem();
 	});
 
 	let clearDeploymentDisposable = vscode.commands.registerCommand('octopus-logs.clearDeployment', async () => {
 		await vscode.commands.executeCommand('octopus-logs.clearRelease');
 		selectedDeployment = undefined;
+		await updateOctopusStatusBarItem();
 	});
 
 	context.subscriptions.push(initOctopusDisposable);
@@ -121,6 +129,10 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(clearProjectDisposable);
 	context.subscriptions.push(clearReleaseDisposable);
 	context.subscriptions.push(clearDeploymentDisposable);
+
+	octopusStatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left);
+	octopusStatusBarItem.command = 'octopus-logs.viewDeploymentLog';
+	context.subscriptions.push(octopusStatusBarItem);
 
 	let initializeClient = async () => {
 		try {
@@ -144,6 +156,17 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 	};
 
+	let updateOctopusStatusBarItem = async () => {
+		let selectedPath: string = '';
+		selectedPath += selectedProject?.Name ?? '';
+		if(selectedRelease) {
+			selectedPath += ` > ${selectedRelease.Version}`;
+		}
+		if(selectedDeployment) {
+			selectedPath += ` > ${selectedDeployment.Name}`;
+		}
+		octopusStatusBarItem.text = `$(file) ${selectedPath}`;
+	};
 
 	/**
 	 *	Retrieve data from API
@@ -287,6 +310,8 @@ export function activate(context: vscode.ExtensionContext) {
 	};
 
 	initializeClient();
+	updateOctopusStatusBarItem();
+	octopusStatusBarItem.show();
 }
 
 // this method is called when your extension is deactivated

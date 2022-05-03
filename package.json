@@ -13,6 +13,7 @@
     "*"
   ],
   "main": "./out/extension.js",
+  "icon": "images/Log-White_140px.png",
   "contributes": {
     "commands": [
       {
